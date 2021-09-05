@@ -31,6 +31,7 @@ class GoogleSignInUserData {
     this.displayName,
     this.photoUrl,
     this.idToken,
+    this.serverAuthCode,
   });
 
   /// The display name of the signed in user.
@@ -66,6 +67,8 @@ class GoogleSignInUserData {
   /// data.
   String? idToken;
 
+  String? serverAuthCode;
+
   @override
   int get hashCode =>
       hashObjects(<String?>[displayName, email, id, photoUrl, idToken]);
@@ -79,7 +82,8 @@ class GoogleSignInUserData {
         otherUserData.email == email &&
         otherUserData.id == id &&
         otherUserData.photoUrl == photoUrl &&
-        otherUserData.idToken == idToken;
+        otherUserData.idToken == idToken  &&
+        otherUserData.serverAuthCode == serverAuthCode;
   }
 }
 
