@@ -1,10 +1,8 @@
-// Copyright 2013 The Flutter Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
+// Copyright 2017, the Flutter project authors.  Please see the AUTHORS file
+// for details. All rights reserved. Use of this source code is governed by a
+// BSD-style license that can be found in the LICENSE file.
 
 #import "FLTGoogleSignInPlugin.h"
-#import "FLTGoogleSignInPlugin_Test.h"
-
 #import <GoogleSignIn/GoogleSignIn.h>
 
 // The key within `GoogleService-Info.plist` used to hold the application's
@@ -37,15 +35,11 @@ static FlutterError *getFlutterError(NSError *error) {
 }
 
 @interface FLTGoogleSignInPlugin () <GIDSignInDelegate>
-@property(strong, readonly) GIDSignIn *signIn;
-
-// Redeclared as not a designated initializer.
-- (instancetype)init;
 @end
 
 @implementation FLTGoogleSignInPlugin {
   FlutterResult _accountRequest;
-  NSArray<NSString *> *_additionalScopesRequest;
+  NSArray *_additionalScopesRequest;
 }
 
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar {
@@ -58,14 +52,9 @@ static FlutterError *getFlutterError(NSError *error) {
 }
 
 - (instancetype)init {
-  return [self initWithSignIn:GIDSignIn.sharedInstance];
-}
-
-- (instancetype)initWithSignIn:(GIDSignIn *)signIn {
   self = [super init];
   if (self) {
-    _signIn = signIn;
-    _signIn.delegate = self;
+    [GIDSignIn sharedInstance].delegate = self;
 
     // On the iOS simulator, we get "Broken pipe" errors after sign-in for some
     // unknown reason. We can avoid crashing the app by ignoring them.
@@ -87,23 +76,11 @@ static FlutterError *getFlutterError(NSError *error) {
       NSString *path = [[NSBundle mainBundle] pathForResource:@"GoogleService-Info"
                                                        ofType:@"plist"];
       if (path) {
-        NSMutableDictionary<NSString *, NSString *> *plist =
-            [[NSMutableDictionary alloc] initWithContentsOfFile:path];
-        BOOL hasDynamicClientId = [call.arguments[@"clientId"] isKindOfClass:[NSString class]];
-
-        if (hasDynamicClientId) {
-          self.signIn.clientID = call.arguments[@"clientId"];
-        } else {
-          self.signIn.clientID = plist[kClientIdKey];
-        }
-
-        self.signIn.serverClientID = plist[kServerClientIdKey];
-        self.signIn.scopes = call.arguments[@"scopes"];
-        if (call.arguments[@"hostedDomain"] == [NSNull null]) {
-          self.signIn.hostedDomain = nil;
-        } else {
-          self.signIn.hostedDomain = call.arguments[@"hostedDomain"];
-        }
+        NSMutableDictionary *plist = [[NSMutableDictionary alloc] initWithContentsOfFile:path];
+        [GIDSignIn sharedInstance].clientID = plist[kClientIdKey];
+        [GIDSignIn sharedInstance].serverClientID = plist[kServerClientIdKey];
+        [GIDSignIn sharedInstance].scopes = call.arguments[@"scopes"];
+        [GIDSignIn sharedInstance].hostedDomain = call.arguments[@"hostedDomain"];
         result(nil);
       } else {
         result([FlutterError errorWithCode:@"missing-config"
@@ -113,23 +90,23 @@ static FlutterError *getFlutterError(NSError *error) {
     }
   } else if ([call.method isEqualToString:@"signInSilently"]) {
     if ([self setAccountRequest:result]) {
-      [self.signIn restorePreviousSignIn];
+      [[GIDSignIn sharedInstance] restorePreviousSignIn];
     }
   } else if ([call.method isEqualToString:@"isSignedIn"]) {
-    result(@([self.signIn hasPreviousSignIn]));
+    result(@([[GIDSignIn sharedInstance] hasPreviousSignIn]));
   } else if ([call.method isEqualToString:@"signIn"]) {
-    self.signIn.presentingViewController = [self topViewController];
+    [GIDSignIn sharedInstance].presentingViewController = [self topViewController];
 
     if ([self setAccountRequest:result]) {
       @try {
-        [self.signIn signIn];
+        [[GIDSignIn sharedInstance] signIn];
       } @catch (NSException *e) {
         result([FlutterError errorWithCode:@"google_sign_in" message:e.reason details:e.name]);
         [e raise];
       }
     }
   } else if ([call.method isEqualToString:@"getTokens"]) {
-    GIDGoogleUser *currentUser = self.signIn.currentUser;
+    GIDGoogleUser *currentUser = [GIDSignIn sharedInstance].currentUser;
     GIDAuthentication *auth = currentUser.authentication;
     [auth getTokensWithHandler:^void(GIDAuthentication *authentication, NSError *error) {
       result(error != nil ? getFlutterError(error) : @{
@@ -139,18 +116,18 @@ static FlutterError *getFlutterError(NSError *error) {
       });
     }];
   } else if ([call.method isEqualToString:@"signOut"]) {
-    [self.signIn signOut];
+    [[GIDSignIn sharedInstance] signOut];
     result(nil);
   } else if ([call.method isEqualToString:@"disconnect"]) {
     if ([self setAccountRequest:result]) {
-      [self.signIn disconnect];
+      [[GIDSignIn sharedInstance] disconnect];
     }
   } else if ([call.method isEqualToString:@"clearAuthCache"]) {
     // There's nothing to be done here on iOS since the expired/invalid
     // tokens are refreshed automatically by getTokensWithHandler.
     result(nil);
   } else if ([call.method isEqualToString:@"requestScopes"]) {
-    GIDGoogleUser *user = self.signIn.currentUser;
+    GIDGoogleUser *user = [GIDSignIn sharedInstance].currentUser;
     if (user == nil) {
       result([FlutterError errorWithCode:@"sign_in_required"
                                  message:@"No account to grant scopes."
@@ -158,9 +135,9 @@ static FlutterError *getFlutterError(NSError *error) {
       return;
     }
 
-    NSArray<NSString *> *currentScopes = self.signIn.scopes;
-    NSArray<NSString *> *scopes = call.arguments[@"scopes"];
-    NSArray<NSString *> *missingScopes = [scopes
+    NSArray *currentScopes = [GIDSignIn sharedInstance].scopes;
+    NSArray *scopes = call.arguments[@"scopes"];
+    NSArray *missingScopes = [scopes
         filteredArrayUsingPredicate:[NSPredicate
                                         predicateWithBlock:^BOOL(id scope, NSDictionary *bindings) {
                                           return ![user.grantedScopes containsObject:scope];
@@ -173,11 +150,12 @@ static FlutterError *getFlutterError(NSError *error) {
 
     if ([self setAccountRequest:result]) {
       _additionalScopesRequest = missingScopes;
-      self.signIn.scopes = [currentScopes arrayByAddingObjectsFromArray:missingScopes];
-      self.signIn.presentingViewController = [self topViewController];
-      self.signIn.loginHint = user.profile.email;
+      [GIDSignIn sharedInstance].scopes =
+          [currentScopes arrayByAddingObjectsFromArray:missingScopes];
+      [GIDSignIn sharedInstance].presentingViewController = [self topViewController];
+      [GIDSignIn sharedInstance].loginHint = user.profile.email;
       @try {
-        [self.signIn signIn];
+        [[GIDSignIn sharedInstance] signIn];
       } @catch (NSException *e) {
         result([FlutterError errorWithCode:@"request_scopes" message:e.reason details:e.name]);
       }
@@ -198,10 +176,8 @@ static FlutterError *getFlutterError(NSError *error) {
   return YES;
 }
 
-- (BOOL)application:(UIApplication *)app
-            openURL:(NSURL *)url
-            options:(NSDictionary<UIApplicationOpenURLOptionsKey, id> *)options {
-  return [self.signIn handleURL:url];
+- (BOOL)application:(UIApplication *)app openURL:(NSURL *)url options:(NSDictionary *)options {
+  return [[GIDSignIn sharedInstance] handleURL:url];
 }
 
 #pragma mark - <GIDSignInUIDelegate> protocol
@@ -263,7 +239,7 @@ static FlutterError *getFlutterError(NSError *error) {
 
 #pragma mark - private methods
 
-- (void)respondWithAccount:(NSDictionary<NSString *, id> *)account error:(NSError *)error {
+- (void)respondWithAccount:(id)account error:(NSError *)error {
   FlutterResult result = _accountRequest;
   _accountRequest = nil;
   result(error != nil ? getFlutterError(error) : account);
