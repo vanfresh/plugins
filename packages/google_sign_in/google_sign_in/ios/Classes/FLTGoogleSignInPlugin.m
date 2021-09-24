@@ -109,11 +109,15 @@ static FlutterError *getFlutterError(NSError *error) {
     GIDGoogleUser *currentUser = [GIDSignIn sharedInstance].currentUser;
     GIDAuthentication *auth = currentUser.authentication;
     [auth getTokensWithHandler:^void(GIDAuthentication *authentication, NSError *error) {
-      result(error != nil ? getFlutterError(error) : @{
-        @"idToken" : authentication.idToken,
-        @"accessToken" : authentication.accessToken,
-        @"serverAuthCode" : currentUser.serverAuthCode != nil ? currentUser.serverAuthCode : "",
-      });
+      if(error != nil) {
+        result(getFlutterError(error));
+      } else {
+        result(@{
+           @"idToken" : authentication.idToken,
+           @"accessToken" : authentication.accessToken,
+           @"serverAuthCode" :  currentUser.serverAuthCode != nil ? currentUser.serverAuthCode : @"",
+        });
+      }
     }];
   } else if ([call.method isEqualToString:@"signOut"]) {
     [[GIDSignIn sharedInstance] signOut];
