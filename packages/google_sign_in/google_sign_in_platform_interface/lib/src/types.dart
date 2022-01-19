@@ -67,11 +67,12 @@ class GoogleSignInUserData {
   /// data.
   String? idToken;
 
+  /// Server auth code used to access Google Login
   String? serverAuthCode;
 
   @override
-  int get hashCode =>
-      hashObjects(<String?>[displayName, email, id, photoUrl, idToken]);
+  int get hashCode => hashObjects(
+      <String?>[displayName, email, id, photoUrl, idToken, serverAuthCode]);
 
   @override
   bool operator ==(dynamic other) {
@@ -82,7 +83,7 @@ class GoogleSignInUserData {
         otherUserData.email == email &&
         otherUserData.id == id &&
         otherUserData.photoUrl == photoUrl &&
-        otherUserData.idToken == idToken  &&
+        otherUserData.idToken == idToken &&
         otherUserData.serverAuthCode == serverAuthCode;
   }
 }

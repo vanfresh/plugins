@@ -15,7 +15,7 @@ GoogleSignInUserData? getUserDataFromMap(Map<String, dynamic>? data) {
       displayName: data['displayName'],
       photoUrl: data['photoUrl'],
       idToken: data['idToken'],
-      serverAuthCode: data['serverAuthCode'],);
+      serverAuthCode: data['serverAuthCode']);
 }
 
 /// Converts token data coming from native code into the proper platform interface type.
